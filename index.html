@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labirinto AI - Teachable Machine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #380991 0%, #170261 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 350px 1fr 350px;
+            gap: 30px;
+            max-width: 1600px;
+            width: 100%;
+        }
+        
+        .panel {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        
+        .panel h2 {
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .game-header {
+            text-align: center;
+            width: 100%;
+        }
+        
+        .game-header h1 {
+            font-size: 3em;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+            margin-bottom: 15px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px 20px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.2em;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #ffd700;
+            font-size: 1.3em;
+        }
+        
+        #gameCanvas {
+            border: 5px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            background: #1a1a2e;
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+            image-rendering: pixelated;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+        }
+        
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 140px;
+        }
+        
+        button:hover:not(:disabled) {
+            background: white;
+            color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        button.primary {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            border: none;
+        }
+        
+        button.primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #0d7a6f, #2dd967);
+            transform: translateY(-3px) scale(1.05);
+        }
+        
+        button.danger {
+            background: linear-gradient(135deg, #fa709a, #fee140);
+            border: none;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            font-size: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #38ef7d;
+            background: white;
+        }
+        
+        .video-container {
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.3);
+            margin: 20px 0;
+        }
+        
+        #webcam {
+            width: 100%;
+            display: block;
+            transform: scaleX(-1);
+        }
+        
+        .detection-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 6em;
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.8),
+                         0 0 40px currentColor;
+            animation: float 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.15); }
+        }
+        
+        .confidence {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        
+        .confidence-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #11998e, #38ef7d);
+            transition: width 0.3s;
+            border-radius: 4px;
+        }
+        
+        .predictions {
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        
+        .prediction {
+            margin: 12px 0;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .prediction.active {
+            border-left-color: #38ef7d;
+            background: rgba(56, 239, 125, 0.2);
+        }
+        
+        .prediction-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+        
+        .prediction-bar {
+            height: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .prediction-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 5px;
+            transition: width 0.3s;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 600;
+            margin: 15px 0;
+        }
+        
+        .status.loading {
+            background: rgba(255, 193, 7, 0.3);
+            border: 2px solid #ffc107;
+        }
+        
+        .status.ready {
+            background: rgba(40, 167, 69, 0.3);
+            border: 2px solid #28a745;
+        }
+        
+        .status.error {
+            background: rgba(220, 53, 69, 0.3);
+            border: 2px solid #dc3545;
+        }
+        
+        .instructions {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        
+        .instruction-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 10px 0;
+            font-size: 0.95em;
+        }
+        
+        .instruction-icon {
+            font-size: 1.8em;
+            min-width: 40px;
+        }
+        
+        @media (max-width: 1400px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel">
+            <h2>🎮 Configuração</h2>
+            
+            <label>URL do Modelo Teachable Machine:</label>
+            <input type="text" id="modelURL" placeholder="Cole a URL do seu modelo aqui">
+            <button onclick="loadModel()" style="width: 100%; margin-top: 15px;">Carregar Modelo</button>
+            
+            <div id="status" class="status">⏳ Aguardando modelo</div>
+            
+            <div class="instructions">
+                <h3 style="margin-bottom: 15px;">📋 Como Jogar:</h3>
+                <div class="instruction-item">
+                    <span class="instruction-icon">🎯</span>
+                    <span>Colete todas as moedas douradas</span>
+                </div>
+                <div class="instruction-item">
+                    <span class="instruction-icon">🚫</span>
+                    <span>Não encoste nas paredes cinzas</span>
+                </div>
+                <div class="instruction-item">
+                    <span class="instruction-icon">👆👇👈👉</span>
+                    <span>Use gestos ou setas para mover</span>
+                </div>
+                <div class="instruction-item">
+                    <span class="instruction-icon">⚡</span>
+                    <span>Colete rápido para bônus de tempo</span>
+                </div>
+            </div>
+            
+            <div class="video-container">
+                <video id="webcam" width="300" height="300" autoplay></video>
+                <div class="detection-overlay" id="detectionIcon"></div>
+                <div class="confidence">
+                    <div>Confiança: <span id="confidenceText">0%</span></div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidenceFill"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-area">
+            <div class="game-header">
+                <h1>🎮 Labirinto AI</h1>
+                <div class="stats">
+                    <div class="stat-box">
+                        <span>💰</span>
+                        <span>Moedas: <span class="stat-value" id="coins">0</span></span>
+                    </div>
+                    <div class="stat-box">
+                        <span>⏱️</span>
+                        <span>Tempo: <span class="stat-value" id="timer">60</span>s</span>
+                    </div>
+                    <div class="stat-box">
+                        <span>🏆</span>
+                        <span>Recorde: <span class="stat-value" id="record">0</span></span>
+                    </div>
+                </div>
+            </div>
+            
+            <canvas id="gameCanvas" width="600" height="600"></canvas>
+            
+            <div class="controls">
+                <button class="primary" id="startBtn" onclick="startGame()">▶️ Iniciar Jogo</button>
+                <button onclick="resetGame()">🔄 Reiniciar</button>
+                <button class="danger" onclick="pauseGame()">⏸️ Pausar</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>📊 Predições</h2>
+            <div class="predictions" id="predictions"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    
+    <script>
+        let model, webcam, maxPredictions;
+        let gameRunning = false;
+        let gamePaused = false;
+        let coins = 0;
+        let timeLeft = 60;
+        let record = 0;
+        let detectionThreshold = 0.75;
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const tileSize = 40;
+        const gridSize = canvas.width / tileSize;
+        
+        let player = { x: 1, y: 1 };
+        let direction = null;
+        let coinList = [];
+        let timerInterval;
+        
+        const maze = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+            [1,0,1,0,1,0,1,1,1,0,1,0,1,0,1],
+            [1,0,1,0,0,0,0,0,1,0,0,0,1,0,1],
+            [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,0,1,1,1,0,1,1,1,0,1,1,1],
+            [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+            [1,0,1,0,1,0,1,1,1,0,1,0,1,0,1],
+            [1,0,1,0,0,0,0,0,1,0,0,0,1,0,1],
+            [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,0,1,1,1,0,1,1,1,0,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+        
+        const directionIcons = {
+            'cima': '⬆️',
+            'baixo': '⬇️',
+            'esquerda': '⬅️',
+            'direita': '➡️',
+            'parado': '✋'
+        };
+        
+        const directionColors = {
+            'cima': '#00ffff',
+            'baixo': '#ff00ff',
+            'esquerda': '#ffff00',
+            'direita': '#00ff00',
+            'parado': '#ffffff'
+        };
+        
+        function showStatus(msg, type) {
+            const status = document.getElementById('status');
+            status.textContent = msg;
+            status.className = `status ${type}`;
+        }
+        
+        async function loadModel() {
+            const url = document.getElementById('modelURL').value.trim();
+            if (!url) {
+                showStatus('❌ Insira a URL do modelo!', 'error');
+                return;
+            }
+            
+            showStatus('⏳ Carregando modelo...', 'loading');
+            
+            try {
+                const modelURL = url.endsWith('/') ? url : url + '/';
+                model = await tmImage.load(modelURL + 'model.json', modelURL + 'metadata.json');
+                maxPredictions = model.getTotalClasses();
+                
+                webcam = new tmImage.Webcam(300, 300, true);
+                await webcam.setup();
+                await webcam.play();
+                
+                document.getElementById('webcam').srcObject = webcam.webcam.srcObject;
+                
+                showStatus('✅ Modelo carregado!', 'ready');
+                document.getElementById('startBtn').disabled = false;
+                
+                predictLoop();
+            } catch (error) {
+                showStatus('❌ Erro: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        async function predictLoop() {
+            if (webcam && model) {
+                await webcam.update();
+                await predict();
+                requestAnimationFrame(predictLoop);
+            }
+        }
+        
+        async function predict() {
+            if (!model) return;
+            
+            try {
+                const prediction = await model.predict(webcam.canvas);
+                
+                let maxProb = 0;
+                let detected = null;
+                
+                prediction.forEach(p => {
+                    if (p.probability > maxProb) {
+                        maxProb = p.probability;
+                        detected = p.className.toLowerCase().trim();
+                    }
+                });
+                
+                const html = prediction.map(p => {
+                    const percent = (p.probability * 100).toFixed(0);
+                    const isActive = p.className.toLowerCase().trim() === detected && maxProb > detectionThreshold;
+                    return `
+                        <div class="prediction ${isActive ? 'active' : ''}">
+                            <div class="prediction-header">
+                                <strong>${p.className}</strong>
+                                <span>${percent}%</span>
+                            </div>
+                            <div class="prediction-bar">
+                                <div class="prediction-fill" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                document.getElementById('predictions').innerHTML = html;
+                document.getElementById('confidenceText').textContent = (maxProb * 100).toFixed(0) + '%';
+                document.getElementById('confidenceFill').style.width = (maxProb * 100) + '%';
+                
+                const icon = document.getElementById('detectionIcon');
+                if (maxProb > detectionThreshold && detected) {
+                    icon.textContent = directionIcons[detected] || '';
+                    icon.style.color = directionColors[detected] || '#fff';
+                    
+                    if (gameRunning && !gamePaused && detected !== 'parado') {
+                        direction = detected;
+                    }
+                } else {
+                    icon.textContent = '';
+                }
+            } catch (error) {
+                console.error('Erro na predição:', error);
+            }
+        }
+        
+        function spawnCoins() {
+            coinList = [];
+            for (let y = 0; y < maze.length; y++) {
+                for (let x = 0; x < maze[y].length; x++) {
+                    if (maze[y][x] === 0 && Math.random() < 0.15) {
+                        if (!(x === 1 && y === 1)) {
+                            coinList.push({x, y});
+                        }
+                    }
+                }
+            }
+        }
+        
+        function startGame() {
+            if (!model) {
+                showStatus('❌ Carregue o modelo primeiro!', 'error');
+                return;
+            }
+            
+            gameRunning = true;
+            gamePaused = false;
+            coins = 0;
+            timeLeft = 60;
+            player = { x: 1, y: 1 };
+            direction = null;
+            
+            document.getElementById('coins').textContent = coins;
+            document.getElementById('timer').textContent = timeLeft;
+            document.getElementById('startBtn').disabled = true;
+            
+            spawnCoins();
+            drawGame();
+            
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gamePaused && gameRunning) {
+                    timeLeft--;
+                    document.getElementById('timer').textContent = timeLeft;
+                    
+                    if (timeLeft <= 0) {
+                        endGame();
+                    }
+                }
+            }, 1000);
+            
+            gameLoop();
+        }
+        
+        function gameLoop() {
+            if (!gameRunning) return;
+            if (!gamePaused && direction) {
+                movePlayer();
+            }
+            drawGame();
+            setTimeout(gameLoop, 200);
+        }
+        
+        function movePlayer() {
+            const newPos = {x: player.x, y: player.y};
+            
+            if (direction === 'cima') newPos.y--;
+            else if (direction === 'baixo') newPos.y++;
+            else if (direction === 'esquerda') newPos.x--;
+            else if (direction === 'direita') newPos.x++;
+            
+            if (maze[newPos.y] && maze[newPos.y][newPos.x] === 0) {
+                player = newPos;
+                
+                const coinIndex = coinList.findIndex(c => c.x === player.x && c.y === player.y);
+                if (coinIndex !== -1) {
+                    coinList.splice(coinIndex, 1);
+                    coins++;
+                    document.getElementById('coins').textContent = coins;
+                    
+                    if (coins > record) {
+                        record = coins;
+                        document.getElementById('record').textContent = record;
+                    }
+                    
+                    if (coinList.length === 0) {
+                        endGame(true);
+                    }
+                }
+            }
+        }
+        
+        function drawGame() {
+            ctx.fillStyle = '#0f1729';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            for (let y = 0; y < maze.length; y++) {
+                for (let x = 0; x < maze[y].length; x++) {
+                    if (maze[y][x] === 1) {
+                        const gradient = ctx.createLinearGradient(
+                            x * tileSize, y * tileSize,
+                            x * tileSize + tileSize, y * tileSize + tileSize
+                        );
+                        gradient.addColorStop(0, '#2d3561');
+                        gradient.addColorStop(1, '#1a1f3a');
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                        ctx.strokeStyle = '#1a1f3a';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    }
+                }
+            }
+            
+            coinList.forEach(coin => {
+                ctx.fillStyle = '#ffd700';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ffd700';
+                ctx.beginPath();
+                ctx.arc(
+                    coin.x * tileSize + tileSize/2,
+                    coin.y * tileSize + tileSize/2,
+                    tileSize/3,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+            
+            const gradient = ctx.createRadialGradient(
+                player.x * tileSize + tileSize/2,
+                player.y * tileSize + tileSize/2,
+                0,
+                player.x * tileSize + tileSize/2,
+                player.y * tileSize + tileSize/2,
+                tileSize/2
+            );
+            gradient.addColorStop(0, '#00ffff');
+            gradient.addColorStop(1, '#00ccff');
+            ctx.fillStyle = gradient;
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = '#00ffff';
+            ctx.beginPath();
+            ctx.arc(
+                player.x * tileSize + tileSize/2,
+                player.y * tileSize + tileSize/2,
+                tileSize/2.5,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('😊', player.x * tileSize + tileSize/2, player.y * tileSize + tileSize/2 + 6);
+        }
+        
+        function pauseGame() {
+            if (!gameRunning) return;
+            gamePaused = !gamePaused;
+            document.querySelector('.danger').textContent = gamePaused ? '▶️ Continuar' : '⏸️ Pausar';
+        }
+        
+        function resetGame() {
+            gameRunning = false;
+            gamePaused = false;
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('startBtn').disabled = false;
+            document.querySelector('.danger').textContent = '⏸️ Pausar';
+            coins = 0;
+            timeLeft = 60;
+            player = { x: 1, y: 1 };
+            direction = null;
+            coinList = [];
+            document.getElementById('coins').textContent = coins;
+            document.getElementById('timer').textContent = timeLeft;
+            drawGame();
+        }
+        
+        function endGame(won = false) {
+            gameRunning = false;
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('startBtn').disabled = false;
+            
+            if (won) {
+                alert(`🎉 Parabéns! Você coletou todas as ${coins} moedas!\n⏱️ Tempo restante: ${timeLeft}s`);
+            } else {
+                alert(`⏰ Tempo esgotado!\n💰 Você coletou ${coins} moedas`);
+            }
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning || gamePaused) return;
+            const keys = {
+                'ArrowUp': 'cima',
+                'ArrowDown': 'baixo',
+                'ArrowLeft': 'esquerda',
+                'ArrowRight': 'direita'
+            };
+            if (keys[e.key]) {
+                direction = keys[e.key];
+                e.preventDefault();
+            }
+        });
+        
+        window.addEventListener('load', () => {
+            document.getElementById('startBtn').disabled = true;
+            drawGame();
+        });
+    </script>
+</body>
+</html>
